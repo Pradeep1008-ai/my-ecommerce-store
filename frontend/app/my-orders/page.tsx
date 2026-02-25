@@ -20,7 +20,7 @@ export default function MyOrders() {
       setUser(parsedUser)
 
       try {
-        const res = await fetch("http://localhost:5000/api/my-orders", {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/my-orders`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId: parsedUser.id }),
@@ -138,7 +138,7 @@ export default function MyOrders() {
                   {/* DOWNLOAD INVOICE BUTTON */}
                   <div className="mt-4 md:mt-0 flex items-center">
                     <a
-                      href={`http://localhost:5000/api/orders/${order._id}/invoice`}
+                      href={`${process.env.NEXT_PUBLIC_API_URL}/api/orders/${order._id}/invoice`}
                       target="_blank"
                       rel="noreferrer"
                       className="bg-red-600/20 text-red-500 hover:bg-red-600 hover:text-white border border-red-900/50 px-4 py-2 text-xs font-bold tracking-widest uppercase transition-colors"

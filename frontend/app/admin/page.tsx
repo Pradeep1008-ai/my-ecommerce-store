@@ -45,9 +45,9 @@ export default function AdminDashboard() {
     setIsLoading(true)
     try {
       const [ordersRes, productsRes] = await Promise.all([
-        fetch("http://localhost:5000/api/orders"),
-        fetch("http://localhost:5000/api/products"),
-      ])
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/orders`),
+    fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/products`)
+])
       const ordersData = await ordersRes.json()
       const productsData = await productsRes.json()
 
@@ -79,7 +79,7 @@ export default function AdminDashboard() {
       const formData = new FormData()
       formData.append("image", imageFile)
 
-      const uploadRes = await fetch("http://localhost:5000/api/upload", {
+      const uploadRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/upload`, {
         method: "POST",
         body: formData,
       })
@@ -87,7 +87,7 @@ export default function AdminDashboard() {
 
       if (!uploadData.success) throw new Error("Failed to upload image")
 
-      const res = await fetch("http://localhost:5000/api/products", {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/products`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -125,7 +125,7 @@ export default function AdminDashboard() {
       return
     try {
       const res = await fetch(
-        `http://localhost:5000/api/products/${id}`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/products/${id}`,
         { method: "DELETE" }
       )
       const data = await res.json()
@@ -138,7 +138,7 @@ export default function AdminDashboard() {
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
       const res = await fetch(
-        `http://localhost:5000/api/orders/${orderId}/status`,
+        `${process.env.NEXT_PUBLIC_API_URL}/api/orders/${orderId}/status`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },

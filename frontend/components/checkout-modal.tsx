@@ -38,7 +38,7 @@ export function CheckoutModal({ isOpen, onClose, cartItems }: CheckoutModalProps
   if (!isOpen) return null
 
   // Error-free API URL logic
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || `${process.env.NEXT_PUBLIC_API_URL}`
 
   const subtotal = cartItems.reduce((sum, item) => sum + item.price, 0)
   const gstAmount = subtotal * 0.18
