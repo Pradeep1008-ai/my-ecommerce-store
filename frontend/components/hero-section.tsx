@@ -14,8 +14,18 @@ export function HeroSection() {
       <div className="pointer-events-none absolute inset-0 opacity-[0.03]">
         <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
           <defs>
-            <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
-              <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#FF0000" strokeWidth="0.5" />
+            <pattern
+              id="grid"
+              width="40"
+              height="40"
+              patternUnits="userSpaceOnUse"
+            >
+              <path
+                d="M 40 0 L 0 0 0 40"
+                fill="none"
+                stroke="#FF0000"
+                strokeWidth="0.5"
+              />
             </pattern>
           </defs>
           <rect width="100%" height="100%" fill="url(#grid)" />
@@ -33,16 +43,48 @@ export function HeroSection() {
         <p className="mb-4 font-mono text-xs tracking-[0.3em] text-primary uppercase">
           {"// CLEAN ENERGY EVOLUTION"}
         </p>
-        <h1 className="mb-6 font-sans text-5xl font-bold leading-tight tracking-tight text-foreground md:text-7xl">
-          <span className="text-balance">POWERING</span>
-          <br />
-          <span className="text-primary">YOUR</span>{" "}
-          <span className="text-balance">FUTURE</span>
-        </h1>
+       <h1 className="mb-6 font-sans text-5xl font-bold leading-tight tracking-tight text-foreground md:text-7xl">
+  <span className="text-balance">POWERING</span>
+  <br />
+  <span className="gradient-text">YOUR</span>{" "}
+  <span className="text-balance">FUTURE</span>
+
+  <style jsx>{`
+    .gradient-text {
+      /* Create the gradient colors */
+      background: linear-gradient(
+        to right,
+        #ff0000, /* Red */
+        #010363, /* Orange */
+        #ff0000  /* Back to Red for a seamless loop */
+      );
+      
+      /* Make the background twice as wide so it can move */
+      background-size: 200% auto;
+      
+      /* Clip the background to the text shape */
+      color: transparent;
+      -webkit-background-clip: text;
+      background-clip: text;
+      
+      /* Animate it to flow infinitely */
+      animation: gradient-flow 3s linear infinite;
+    }
+
+    @keyframes gradient-flow {
+      0% {
+        background-position: 0% center;
+      }
+      100% {
+        background-position: 200% center;
+      }
+    }
+  `}</style>
+</h1>
         <p className="mx-auto mb-10 max-w-xl font-mono text-sm leading-relaxed text-muted-foreground">
           High-efficiency solar modules and smart energy systems engineered for
-sustainable performance. Industrial-grade reliability meets next-gen
-renewable innovation.
+          sustainable performance. Industrial-grade reliability meets next-gen
+          renewable innovation.
         </p>
         <button
           onClick={scrollToConsult}
@@ -55,5 +97,5 @@ renewable innovation.
         </button>
       </div>
     </section>
-  )
+  );
 }

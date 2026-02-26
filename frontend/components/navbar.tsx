@@ -67,10 +67,15 @@ export function Navbar({ cartCount = 0 }: { cartCount?: number }) {
           <div className="flex items-center gap-6">
             {mounted && user ? (
               <div className="flex items-center gap-4 border-r border-gray-800 pr-6">
+                {/* --- NEW: USERNAME DISPLAY --- */}
+                <span className="hidden md:inline text-red-500 text-xs font-bold tracking-widest uppercase mr-4">
+                  // {user.name}
+                </span>
+
                 {user.role === "admin" ? (
                   <Link
                     href="/admin"
-                    className="text-red-500 hover:text-red-400 font-bold tracking-widest transition-colors"
+                    className="text-white hover:text-red-400 font-bold tracking-widest transition-colors"
                   >
                     ADMIN_PANEL
                   </Link>
@@ -109,5 +114,5 @@ export function Navbar({ cartCount = 0 }: { cartCount?: number }) {
         </div>
       </nav>
     </>
-  )
+  );
 }

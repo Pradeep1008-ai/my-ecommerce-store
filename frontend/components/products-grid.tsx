@@ -4,7 +4,7 @@ import { ProductCard } from "./product-card"
 
 interface ProductsGridProps {
   products: any[] 
-  onAddToCart: (product: any) => void // <-- UPDATED to receive the product
+  onAddToCart: (product: any) => void 
 }
 
 export function ProductsGrid({ products = [], onAddToCart }: ProductsGridProps) {
@@ -22,21 +22,36 @@ export function ProductsGrid({ products = [], onAddToCart }: ProductsGridProps) 
         
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {products.length > 0 ? (
-            products.map((product) => (
-              <ProductCard
-                key={product._id} 
-                title={product.name} 
-                 price={
-                <span className="flex items-center gap-1">
-                <span className="text-sm mt-[3px]">₹</span>
-                <span className="text-lg font-bold">{product.price}</span>
-                </span>
-                }
-                image={product.imageUrl} 
-                sku={`HSN-${product.hsnCode}`} 
-                onOrder={() => onAddToCart(product)} // <-- UPDATED to pass the product
-              />
-            ))
+            products.map((product) => {
+              
+              // --- THE FIX: DYNAMICALLY OVERRIDE DATABASE URLS ---
+              let fixedImageUrl = product.imageUrl || "";
+              const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000";
+              
+              if (fixedImageUrl.includes("localhost:5000")) {
+                // If DB saved localhost, replace it with the current environment's API URL
+                fixedImageUrl = fixedImageUrl.replace("http://localhost:5000", apiUrl);
+              } else if (!fixedImageUrl.startsWith("http")) {
+                // If DB just saved "uploads/image.png", attach the API URL to the front
+                fixedImageUrl = `${apiUrl}/${fixedImageUrl.replace(/^\//, "")}`;
+              }
+
+              return (
+                <ProductCard
+                  key={product._id} 
+                  title={product.name} 
+                  price={
+                    <span className="flex items-center gap-1">
+                      <span className="text-sm mt-[3px]">₹</span>
+                      <span className="text-lg font-bold">{product.price}</span>
+                    </span>
+                  }
+                  image={fixedImageUrl} 
+                  sku={`HSN-${product.hsnCode}`} 
+                  onOrder={() => onAddToCart(product)} 
+                />
+              )
+            })
           ) : (
             <div className="col-span-full py-10 text-center border border-dashed border-red-900/50">
               <p className="font-mono text-red-500 animate-pulse">// SYSTEM_LOADING_DATA...</p>

@@ -9,7 +9,7 @@ const jwt = require("jsonwebtoken");
 const nodemailer = require("nodemailer");
 const multer = require("multer");
 const path = require("path");
-const fs = require("fs"); 
+const fs = require("fs");
 const PDFDocument = require("pdfkit");
 const Razorpay = require("razorpay");
 const crypto = require("crypto");
@@ -142,7 +142,7 @@ app.post("/api/login", async (req, res) => {
     const token = jwt.sign(
       { id: user._id, role: user.role },
       process.env.JWT_SECRET,
-      { expiresIn: "1d" }
+      { expiresIn: "1d" },
     );
 
     res.json({
@@ -182,8 +182,7 @@ app.post("/api/razorpay/verify-payment", (req, res) => {
       .update(sign)
       .digest("hex");
 
-    if (expected === razorpay_signature)
-      return res.json({ success: true });
+    if (expected === razorpay_signature) return res.json({ success: true });
 
     res.status(400).json({ success: false });
   } catch {
@@ -194,9 +193,6 @@ app.post("/api/razorpay/verify-payment", (req, res) => {
 // ================= ORDERS =================
 app.post("/api/orders", async (req, res) => {
   try {
-    // Telsina error: Frontend nunchi vachina payload motham Order lo save avvali.
-    // Mee schema lo addressLine1, city ivanni levu anukunta, anduke save avvatledu.
-    // Model ni kuda update chesukondi.
     const order = new Order(req.body);
     const savedOrder = await order.save();
 
@@ -204,10 +200,9 @@ app.post("/api/orders", async (req, res) => {
 
     // Background email + invoice
     setImmediate(() => sendInvoiceEmail(savedOrder));
-    
-    // Background lo Google Sheets ki data send cheyadam
+
+    // Background Google Sheets update
     setImmediate(() => appendOrderToSheet(savedOrder));
-    
   } catch (err) {
     if (!res.headersSent)
       res.status(500).json({ success: false, error: err.message });
@@ -231,31 +226,73 @@ app.post("/api/my-orders", async (req, res) => {
   res.json({ success: true, orders });
 });
 
-// ================= ADMIN & USER ORDERS =================
-app.put('/api/orders/:id/status', async (req, res) => {
+app.put("/api/orders/:id/status", async (req, res) => {
   try {
     const { status } = req.body;
-    
-    // Database lo update
+
+    // Database update
     await Order.findByIdAndUpdate(req.params.id, { status });
     res.json({ success: true, message: "Order status updated!" });
 
-    // Background lo Google Sheet lo status update cheyadam
+    // Background Google Sheet update
     setImmediate(() => updateOrderStatusInSheet(req.params.id, status));
-
   } catch (error) {
     res.status(500).json({ success: false, message: "Server Error" });
   }
 });
 
+// ================= CANCEL ORDER (NEW) =================
+app.put("/api/orders/:id/cancel", async (req, res) => {
+  try {
+    const orderId = req.params.id;
+    const order = await Order.findById(orderId);
+
+    if (!order) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Order not found" });
+    }
+
+    // Strictly prevent cancellation if already shipped
+    if (order.status === "Shipped") {
+      return res.status(400).json({
+        success: false,
+        message: "This order has already been shipped and cannot be cancelled.",
+      });
+    }
+
+    // Change status to Cancelled and save
+    order.status = "Cancelled";
+    await order.save();
+
+    res.json({
+      success: true,
+      message: "Order successfully cancelled.",
+      order,
+    });
+
+    // Update Google Sheets in the background automatically!
+    setImmediate(() => updateOrderStatusInSheet(orderId, "Cancelled"));
+  } catch (error) {
+    console.error("Cancellation Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server Error: Could not cancel order.",
+    });
+  }
+});
+
 // ================= PDF DOWNLOAD API =================
-app.get('/api/orders/:id/invoice', async (req, res) => {
+app.get("/api/orders/:id/invoice", async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
     if (!order) return res.status(404).json({ message: "Order not found" });
 
-    res.setHeader('Content-Type', 'application/pdf');
-    res.setHeader('Content-Disposition', `attachment; filename=Solux-Invoice-${order._id.toString().slice(-6).toUpperCase()}.pdf`);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `attachment; filename=Solux-Invoice-${order._id.toString().slice(-6).toUpperCase()}.pdf`,
+    );
 
     const doc = generateInvoiceDoc(order);
     doc.pipe(res);
@@ -269,21 +306,22 @@ app.get('/api/orders/:id/invoice', async (req, res) => {
 function generateInvoiceDoc(order) {
   const doc = new PDFDocument({ size: "A4", margin: 50 });
 
-  // ===== HEADER & LOGO =====
   const logoPath = path.join(__dirname, "uploads", "logo.png");
   let startX = 50;
-  
+
   if (fs.existsSync(logoPath)) {
     try {
       doc.image(logoPath, 50, 45, { width: 50 });
-      startX = 110; 
+      startX = 110;
     } catch (e) {
       console.log("Logo display error:", e);
     }
   }
 
   doc.fontSize(14).font("Helvetica-Bold").text("Solux Solar", startX, 50);
-  doc.font("Helvetica").fontSize(10)
+  doc
+    .font("Helvetica")
+    .fontSize(10)
     .text("Plot No. 105, Sy No. 126 & 103,", startX, 65)
     .text("MSK Mill Road, New Madina Colony,", startX, 80)
     .text("Kalaburagi, Karnataka – 585103.", startX, 95)
@@ -291,81 +329,127 @@ function generateInvoiceDoc(order) {
     .text("Ph: +91 8123378092", startX, 125)
     .text("Email: sales@soluxsolar.com", startX, 140);
 
-  // ===== TITLE =====
-  doc.fontSize(22).font("Helvetica-Bold").text("INVOICE", 50, 50, { align: 'right' });
+  doc
+    .fontSize(22)
+    .font("Helvetica-Bold")
+    .text("INVOICE", 50, 50, { align: "right" });
 
-  // ===== CUSTOMER BLOCK (WITH FULL ADDRESS) =====
-  const custY = 180; 
-  // Safety check, okavela order.customer undefiened ithe crash avvakunda
+  const custY = 180;
   const customer = order.customer || {};
 
-  doc.fontSize(11).font("Helvetica-Bold").text(customer.name || "Customer Name", 50, custY);
+  doc
+    .fontSize(11)
+    .font("Helvetica-Bold")
+    .text(customer.name || "Customer Name", 50, custY);
 
   doc.font("Helvetica");
   let currentY = custY + 15;
-  
-  if (customer.addressLine1) { doc.text(customer.addressLine1, 50, currentY); currentY += 15; }
-  if (customer.addressLine2) { doc.text(customer.addressLine2, 50, currentY); currentY += 15; }
-  
-  const cityState = `${customer.city || ""} ${customer.state || ""}`.trim();
-  const pincode = customer.pincode ? `- ${customer.pincode}` : "";
-  if (cityState || pincode) {
-    doc.text(`${cityState} ${pincode}`.trim(), 50, currentY); 
+
+  if (customer.addressLine1) {
+    doc.text(customer.addressLine1, 50, currentY);
+    currentY += 15;
+  }
+  if (customer.addressLine2) {
+    doc.text(customer.addressLine2, 50, currentY);
     currentY += 15;
   }
 
-  if (customer.phone) { doc.text(`Ph: ${customer.phone}`, 50, currentY); currentY += 15; }
+  const cityState = `${customer.city || ""} ${customer.state || ""}`.trim();
+  const pincode = customer.pincode ? `- ${customer.pincode}` : "";
+  if (cityState || pincode) {
+    doc.text(`${cityState} ${pincode}`.trim(), 50, currentY);
+    currentY += 15;
+  }
+
+  if (customer.phone) {
+    doc.text(`Ph: ${customer.phone}`, 50, currentY);
+    currentY += 15;
+  }
 
   if (customer.gstNumber && customer.gstNumber !== "N/A") {
     doc.text(`GSTIN: ${customer.gstNumber.toUpperCase()}`, 50, currentY);
     currentY += 15;
   }
 
-  // ===== ORDER INFO =====
   const infoX = 350;
   doc.font("Helvetica-Bold").text("Order Number:", infoX, custY);
-  doc.font("Helvetica").text(order._id.toString().slice(-6).toUpperCase(), 450, custY, { width: 90, align: 'right' });
+  doc
+    .font("Helvetica")
+    .text(order._id.toString().slice(-6).toUpperCase(), 450, custY, {
+      width: 90,
+      align: "right",
+    });
 
   doc.font("Helvetica-Bold").text("Order Date:", infoX, custY + 15);
   doc.font("Helvetica").text(
-    new Date(order.createdAt).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" }),
-    450, custY + 15, { width: 90, align: 'right' }
+    new Date(order.createdAt).toLocaleDateString("en-IN", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    }),
+    450,
+    custY + 15,
+    { width: 90, align: "right" },
   );
 
   doc.font("Helvetica-Bold").text("Payment Method:", infoX, custY + 30);
-  doc.font("Helvetica").text(order.paymentMethod || "Cash on delivery", 450, custY + 30, { width: 90, align: 'right' });
+  doc
+    .font("Helvetica")
+    .text(order.paymentMethod || "Cash on delivery", 450, custY + 30, {
+      width: 90,
+      align: "right",
+    });
 
-  // ===== TABLE HEADER =====
-  let tableY = currentY > (custY + 50) ? currentY + 30 : custY + 80;
+  let tableY = currentY > custY + 50 ? currentY + 30 : custY + 80;
   doc.font("Helvetica-Bold");
   doc.text("Product", 50, tableY);
   doc.text("Quantity", 350, tableY);
-  doc.text("Price", 450, tableY, { width: 90, align: 'right' });
+  doc.text("Price", 450, tableY, { width: 90, align: "right" });
 
   tableY += 20;
-  doc.moveTo(50, tableY).lineTo(540, tableY).lineWidth(0.5).strokeColor('#cccccc').stroke();
+  doc
+    .moveTo(50, tableY)
+    .lineTo(540, tableY)
+    .lineWidth(0.5)
+    .strokeColor("#cccccc")
+    .stroke();
 
   tableY += 15;
   doc.font("Helvetica");
 
-  if(order.items && order.items.length > 0){
+  if (order.items && order.items.length > 0) {
     order.items.forEach((item) => {
       doc.fillColor("black").font("Helvetica-Bold").text(item.name, 50, tableY);
-      doc.fontSize(9).font("Helvetica").fillColor("gray")
+      doc
+        .fontSize(9)
+        .font("Helvetica")
+        .fillColor("gray")
         .text(`SKU/HSN: ${item.hsnCode || "N/A"}`, 50, tableY + 12);
 
-      doc.fontSize(11).fillColor("black").font("Helvetica")
+      doc
+        .fontSize(11)
+        .fillColor("black")
+        .font("Helvetica")
         .text(item.quantity || 1, 350, tableY);
 
-      doc.text(`Rs. ${(item.price || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`, 450, tableY, { width: 90, align: 'right' });
+      doc.text(
+        `Rs. ${(item.price || 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}`,
+        450,
+        tableY,
+        { width: 90, align: "right" },
+      );
 
       tableY += 35;
     });
   }
 
-  // ===== TOTALS =====
   tableY += 10;
-  doc.moveTo(350, tableY).lineTo(540, tableY).lineWidth(0.5).strokeColor('#cccccc').stroke();
+  doc
+    .moveTo(350, tableY)
+    .lineTo(540, tableY)
+    .lineWidth(0.5)
+    .strokeColor("#cccccc")
+    .stroke();
   tableY += 15;
 
   const subtotal = order.subtotal || 0;
@@ -373,22 +457,23 @@ function generateInvoiceDoc(order) {
   const sgst = (order.gstAmount || 0) / 2;
   const total = order.totalAmount || 0;
 
-  const money = (v) => `Rs. ${v.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
+  const money = (v) =>
+    `Rs. ${v.toLocaleString("en-IN", { minimumFractionDigits: 2 })}`;
 
   doc.font("Helvetica").text("Subtotal", 350, tableY);
-  doc.text(money(subtotal), 450, tableY, { width: 90, align: 'right' });
+  doc.text(money(subtotal), 450, tableY, { width: 90, align: "right" });
 
   tableY += 20;
   doc.text("CGST(9%)", 350, tableY);
-  doc.text(money(cgst), 450, tableY, { width: 90, align: 'right' });
+  doc.text(money(cgst), 450, tableY, { width: 90, align: "right" });
 
   tableY += 20;
   doc.text("SGST(9%)", 350, tableY);
-  doc.text(money(sgst), 450, tableY, { width: 90, align: 'right' });
+  doc.text(money(sgst), 450, tableY, { width: 90, align: "right" });
 
   tableY += 25;
   doc.font("Helvetica-Bold").text("Total", 350, tableY);
-  doc.text(money(total), 450, tableY, { width: 90, align: 'right' });
+  doc.text(money(total), 450, tableY, { width: 90, align: "right" });
 
   return doc;
 }
@@ -408,7 +493,7 @@ function sendInvoiceEmail(order) {
         to: customer.email,
         bcc: process.env.EMAIL_USER,
         subject: `Invoice #${order._id.toString().slice(-6).toUpperCase()}`,
-        text: `Dear ${customer.name || 'Customer'},\n\nThank you for choosing Solux Solar! Please find your official invoice attached.\n\nBest regards,\nThe Solux Solar Team`,
+        text: `Dear ${customer.name || "Customer"},\n\nThank you for choosing Solux Solar! Please find your official invoice attached.\n\nBest regards,\nThe Solux Solar Team`,
         attachments: [
           {
             filename: `Solux-Invoice-${order._id.toString().slice(-6).toUpperCase()}.pdf`,
@@ -427,11 +512,10 @@ function sendInvoiceEmail(order) {
 
 // ================= GOOGLE SHEETS INTEGRATION =================
 async function appendOrderToSheet(order) {
-  console.log("📝 Google Sheets update start avuthundi...");
   try {
     const auth = new google.auth.GoogleAuth({
-      keyFile: "credentials.json", 
-      scopes: ["https://www.googleapis.com/auth/spreadsheets"], // Fixed: array format
+      keyFile: "credentials.json",
+      scopes: ["https://www.googleapis.com/auth/spreadsheets"],
     });
 
     const client = await auth.getClient();
@@ -439,43 +523,44 @@ async function appendOrderToSheet(order) {
     const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
     const customer = order.customer || {};
-    
-    // Items anni oka string laaga kalapadaniki
-    const productsDetails = order.items && order.items.length > 0
-      ? order.items.map((item) => `${item.name} (Qty: ${item.quantity || 1})`).join(", ")
-      : "No items";
 
-    // Sheet lo columns order (A, B, C, D...)
+    const productsDetails =
+      order.items && order.items.length > 0
+        ? order.items
+            .map((item) => `${item.name} (Qty: ${item.quantity || 1})`)
+            .join(", ")
+        : "No items";
+
     const rowData = [
-      order._id ? order._id.toString().slice(-6).toUpperCase() : "N/A", // Order ID
-      order.createdAt ? new Date(order.createdAt).toLocaleDateString("en-IN") : new Date().toLocaleDateString("en-IN"), // Date
-      customer.name || "N/A", // Customer Name
-      customer.phone || "N/A", // Phone
-      customer.email || "N/A", // Email
-      customer.city || "N/A", // City
-      productsDetails, // Products
-      order.totalAmount || 0, // Total Amount
-      order.paymentMethod || "COD", // Payment Method
-      order.status || "Pending", // Status
+      order._id ? order._id.toString().slice(-6).toUpperCase() : "N/A",
+      order.createdAt
+        ? new Date(order.createdAt).toLocaleDateString("en-IN")
+        : new Date().toLocaleDateString("en-IN"),
+      customer.name || "N/A",
+      customer.phone || "N/A",
+      customer.email || "N/A",
+      customer.city || "N/A",
+      productsDetails,
+      order.totalAmount || 0,
+      order.paymentMethod || "COD",
+      order.status || "Pending",
     ];
 
     const response = await googleSheets.spreadsheets.values.append({
       spreadsheetId,
-      range: "Sheet1!A:J", 
+      range: "Sheet1!A:J",
       valueInputOption: "USER_ENTERED",
-      requestBody: { // Fixed: resource badulu requestBody
+      requestBody: {
         values: [rowData],
       },
     });
-
-    console.log("✅ Order added to Google Sheets successfully! Status:", response.status);
   } catch (error) {
     console.error("❌ Google Sheets Error:", error.message);
   }
 }
+
 // ================= UPDATE STATUS IN GOOGLE SHEETS =================
 async function updateOrderStatusInSheet(orderId, newStatus) {
-  console.log(`📝 Google Sheets status update start... Order: ${orderId}, Status: ${newStatus}`);
   try {
     const { google } = require("googleapis");
     const auth = new google.auth.GoogleAuth({
@@ -487,22 +572,18 @@ async function updateOrderStatusInSheet(orderId, newStatus) {
     const googleSheets = google.sheets({ version: "v4", auth: client });
     const spreadsheetId = process.env.GOOGLE_SHEET_ID;
 
-    // Order ID last 6 chars ni extract cheyadam
     const shortOrderId = orderId.toString().slice(-6).toUpperCase();
 
-    // 1. Mundu Column A (Order IDs) motham read cheddam
     const getRows = await googleSheets.spreadsheets.values.get({
       spreadsheetId,
-      range: "Sheet1!A:A", // Column A matrame read chestunnam
+      range: "Sheet1!A:A",
     });
 
     const rows = getRows.data.values;
     if (!rows || rows.length === 0) {
-      console.log("No data found in sheet.");
       return;
     }
 
-    // 2. Aa Order ID ye row lo undo find cheyadam (Sheets 1-indexed kabatti i+1)
     let rowIndex = -1;
     for (let i = 0; i < rows.length; i++) {
       if (rows[i][0] === shortOrderId) {
@@ -512,25 +593,22 @@ async function updateOrderStatusInSheet(orderId, newStatus) {
     }
 
     if (rowIndex === -1) {
-      console.log("❌ Order ID sheet lo dorakaledu.");
       return;
     }
 
-    // 3. Status column (Column J) ni update cheyadam
     await googleSheets.spreadsheets.values.update({
       spreadsheetId,
-      range: `Sheet1!J${rowIndex}`, // Example: Sheet1!J5
+      range: `Sheet1!J${rowIndex}`,
       valueInputOption: "USER_ENTERED",
       requestBody: {
         values: [[newStatus]],
       },
     });
-
-    console.log(`✅ Order status Google Sheet lo update ayyindi! Row: ${rowIndex}`);
   } catch (error) {
     console.error("❌ Google Sheets Update Error:", error.message);
   }
 }
+
 // ================= DB =================
 const PORT = process.env.PORT || 5000;
 

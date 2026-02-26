@@ -40,6 +40,40 @@ export default function MyOrders() {
     fetchMyOrders()
   }, [])
 
+  // ====== NEW: CANCEL ORDER FUNCTION ======
+  const handleCancelOrder = async (orderId: string) => {
+    // Confirm before cancelling
+    if (!window.confirm("Are you sure you want to cancel this order? This action cannot be undone.")) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/orders/${orderId}/cancel`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        alert("Order successfully cancelled.");
+        // Update the UI immediately without refreshing the page
+        setOrders(prevOrders => 
+          prevOrders.map(order => 
+            order._id === orderId ? { ...order, status: 'Cancelled' } : order
+          )
+        );
+      } else {
+        alert(data.message || "Failed to cancel order.");
+      }
+    } catch (error) {
+      console.error("Error cancelling order:", error);
+      alert("System error. Could not cancel the order at this time.");
+    }
+  }
+
   // Not logged in
   if (!isLoading && !user) {
     return (
@@ -130,13 +164,32 @@ export default function MyOrders() {
                     <span className="text-xs text-gray-500 uppercase tracking-widest block mb-1">
                       Status
                     </span>
-                    <span className="bg-green-900/30 text-green-500 border border-green-900 px-2 py-1 text-xs uppercase">
+                    {/* Dynamic Status Badge */}
+                    <span
+                      className={`border px-2 py-1 text-xs uppercase ${
+                        order.status === "Cancelled"
+                          ? "bg-gray-900/30 text-gray-500 border-gray-800"
+                          : "bg-green-900/30 text-green-500 border-green-900"
+                      }`}
+                    >
                       {order.status}
                     </span>
                   </div>
 
-                  {/* DOWNLOAD INVOICE BUTTON */}
-                  <div className="mt-4 md:mt-0 flex items-center">
+                  {/* BUTTONS (Invoice + Cancel) */}
+                  <div className="mt-4 md:mt-0 flex items-center gap-3">
+                    {/* Hide Cancel button ONLY if it is Shipped, Delivered, or already Cancelled */}
+                    {order.status !== "Shipped" &&
+                      order.status !== "Delivered" &&
+                      order.status !== "Cancelled" && (
+                        <button
+                          onClick={() => handleCancelOrder(order._id)}
+                          className="text-gray-400 hover:text-red-500 text-xs font-bold tracking-widest uppercase transition-colors"
+                        >
+                          Cancel Order
+                        </button>
+                      )}
+
                     <a
                       href={`${process.env.NEXT_PUBLIC_API_URL}/api/orders/${order._id}/invoice`}
                       target="_blank"
@@ -152,9 +205,7 @@ export default function MyOrders() {
                 <div className="space-y-2 mb-4">
                   {order.items.map((item: any, i: number) => (
                     <div key={i} className="flex justify-between text-sm">
-                      <span className="text-gray-400">
-                        • {item.name}
-                      </span>
+                      <span className="text-gray-400">• {item.name}</span>
                       <span>₹{item.price.toFixed(2)}</span>
                     </div>
                   ))}
@@ -178,5 +229,5 @@ export default function MyOrders() {
         )}
       </div>
     </div>
-  )
+  );
 }

@@ -7,6 +7,7 @@ interface CheckoutModalProps {
   isOpen: boolean
   onClose: () => void
   cartItems: any[]
+  onRemoveItem: (index: number) => void
 }
 
 const loadRazorpayScript = () => {
@@ -19,7 +20,7 @@ const loadRazorpayScript = () => {
   })
 }
 
-export function CheckoutModal({ isOpen, onClose, cartItems }: CheckoutModalProps) {
+export function CheckoutModal({ isOpen, onClose, cartItems, onRemoveItem }: CheckoutModalProps) {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -182,16 +183,33 @@ export function CheckoutModal({ isOpen, onClose, cartItems }: CheckoutModalProps
                 <p className="text-sm text-muted-foreground font-mono">Cart is empty.</p>
               ) : (
                 cartItems.map((item, index) => (
-                  <div key={index} className="flex justify-between text-sm font-mono border-b border-gray-800 pb-2">
-                    <span className="truncate pr-2 text-gray-300">
-                      {item.name}
-                      <span className="block text-xs text-gray-500 mt-1">HSN: {item.hsnCode || 'N/A'}</span>
-                    </span>
-                    <div className="flex flex-col items-end">
-                      <span className="text-red-500"><span className="text-[75%] align-center mr-2px">₹</span>{item.price.toFixed(2)}</span>
-                    </div>
-                  </div>
-                ))
+  <div key={index} className="flex justify-between items-start text-sm font-mono border-b border-gray-800 pb-2">
+    
+    <span className="truncate pr-2 text-gray-300">
+      {item.name}
+      <span className="block text-xs text-gray-500 mt-1">
+        HSN: {item.hsnCode || 'N/A'}
+      </span>
+    </span>
+
+    <div className="flex items-center gap-3">
+      <span className="text-red-500">
+        <span className="text-[75%] mr-1">₹</span>
+        {item.price.toFixed(2)}
+      </span>
+
+      {/* ✅ Remove button */}
+      <button
+        type="button"
+        onClick={() => onRemoveItem(index)}
+        className="text-gray-500 hover:text-red-500"
+        title="Remove item"
+      >
+        <X size={16} />
+      </button>
+    </div>
+  </div>
+))
               )}
             </div>
             

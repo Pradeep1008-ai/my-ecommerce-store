@@ -1,6 +1,6 @@
 "use client"
 
-import Image from "next/image"
+// We removed the Next.js Image component import because we are using a standard img tag now
 
 interface ProductCardProps {
   title: string
@@ -14,12 +14,14 @@ export function ProductCard({ title, price, image, sku, onOrder }: ProductCardPr
   return (
     <div className="group flex flex-col border border-border bg-card transition-colors hover:border-primary/50">
       <div className="relative aspect-square overflow-hidden bg-secondary">
-        <Image
+        
+        {/* We are using a standard HTML img tag here. This prevents the Next.js domain block errors */}
+        <img
           src={image}
           alt={title}
-          fill
-          className="object-cover transition-transform duration-500 group-hover:scale-105"
+          className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
+        
         <div className="absolute left-3 top-3 bg-background/80 px-2 py-1 font-mono text-[10px] tracking-wider text-muted-foreground backdrop-blur-sm">
           {sku}
         </div>

@@ -30,7 +30,7 @@ export default function Home() {
     <main className="min-h-screen bg-background relative">
       <Navbar cartCount={cartItems.length} />
       
-      {/* LOGIN BUTTON - Navbar kinda clear ga kanipinchadaniki top-24 pettam */}
+      {/* LOGIN BUTTON */}
       <div className="fixed top-24 right-8 z-40">
         <button 
           onClick={() => setIsAuthOpen(true)}
@@ -61,7 +61,8 @@ export default function Home() {
       <CheckoutModal 
         isOpen={isCheckoutOpen} 
         onClose={() => setIsCheckoutOpen(false)} 
-        cartItems={cartItems} 
+        cartItems={cartItems}
+        onRemoveItem={(indexToRemove) => setCartItems(prev => prev.filter((_, index) => index !== indexToRemove))} 
       />
       
       <AuthModal 
