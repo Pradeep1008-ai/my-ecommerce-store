@@ -1,5 +1,7 @@
 "use client"
 
+import { WebGLShader } from "@/components/ui/web-gl-shader" 
+
 export function HeroSection() {
   const scrollToConsult = () => {
     const el = document.getElementById("consultation")
@@ -10,6 +12,7 @@ export function HeroSection() {
 
   return (
     <section className="relative flex min-h-[80vh] items-center justify-center overflow-hidden border-b border-border bg-background">
+      <WebGLShader /> {/* ← ADD THIS — everything below is unchanged */}
       {/* Grid pattern background */}
       <div className="pointer-events-none absolute inset-0 opacity-[0.03]">
         <svg width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">

@@ -23,9 +23,9 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     setFormData({ ...formData, [e.target.name]: e.target.value })
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
+ const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setIsLoading(true) // Instantly updates UI so button is never unresponsive
+    setIsLoading(true) 
 
     const endpoint = isLogin ? '/api/login' : '/api/register'
     const payload = isLogin 
@@ -41,26 +41,28 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
 
       const data = await res.json()
 
-      if (data.success) {
+      // THE FIX: Check res.ok (HTTP 200) instead of data.success
+      if (res.ok || data.success) {
         if (isLogin) {
-          // Securely store the token and user data in the browser
+          // Securely store the token and user data
           localStorage.setItem('token', data.token)
           localStorage.setItem('user', JSON.stringify(data.user))
-          alert(`Login successful! Welcome, ${data.user.name}`)
-          onClose()
-          window.location.reload() // Quick refresh to update user state across the app
+          
+          onClose() // Close the modal
+          window.location.reload() // Refresh to update navbar
         } else {
           alert("Account created successfully! Please log in.")
-          setIsLogin(true) // Switch to login view automatically
+          setIsLogin(true) 
         }
       } else {
-        alert("Error: " + data.message)
+        // Provide a fallback error message if data.message is undefined
+        alert("Error: " + (data.message || "Invalid credentials. Please try again."))
       }
     } catch (error) {
       console.error("Auth Error:", error)
       alert("Server Offline. Please try again later.")
     } finally {
-      setIsLoading(false) // Restores button state
+      setIsLoading(false) 
     }
   }
 

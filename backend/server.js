@@ -116,29 +116,44 @@ app.post("/api/register", async (req, res) => {
     const { name, email, password } = req.body;
 
     if (await User.findOne({ email }))
-      return res.json({ success: false, message: "User exists" });
+      return res.json({
+        success: false,
+        message: "User already exists with this email",
+      });
 
-    const hash = await bcrypt.hash(password, 10);
-
-    const user = new User({ name, email, password: hash });
+    // FIX: We just pass the raw password now.
+    // Your User.js file will automatically hash it before saving!
+    const user = new User({ name, email, password });
     await user.save();
 
     res.json({ success: true });
   } catch {
-    res.status(500).json({ success: false });
+    res
+      .status(500)
+      .json({ success: false, message: "Server error during registration" });
   }
 });
-
 app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
+    console.log(`\n--- LOGIN ATTEMPT: ${email} ---`);
 
     const user = await User.findOne({ email });
-    if (!user) return res.json({ success: false });
+    if (!user) {
+      console.log("❌ Result: Account not found in Database.");
+      return res.json({ success: false, message: "Account not found" });
+    }
 
+    console.log("✅ User found. Checking password...");
     const match = await bcrypt.compare(password, user.password);
-    if (!match) return res.json({ success: false });
+    console.log(`Password match result: ${match}`);
 
+    if (!match) {
+      console.log("❌ Result: Passwords did not match!");
+      return res.json({ success: false, message: "Invalid email or password" });
+    }
+
+    console.log("✅ Login Successful! Generating token...");
     const token = jwt.sign(
       { id: user._id, role: user.role },
       process.env.JWT_SECRET,
@@ -148,10 +163,19 @@ app.post("/api/login", async (req, res) => {
     res.json({
       success: true,
       token,
-      user: { id: user._id, name: user.name, role: user.role },
+      user: {
+        id: user._id,
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+      },
     });
-  } catch {
-    res.status(500).json({ success: false });
+  } catch (error) {
+    console.error("Login Error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Server error during login" });
   }
 });
 
@@ -191,21 +215,32 @@ app.post("/api/razorpay/verify-payment", (req, res) => {
 });
 
 // ================= ORDERS =================
-app.post("/api/orders", async (req, res) => {
+app.post("/api/my-orders", async (req, res) => {
   try {
-    const order = new Order(req.body);
-    const savedOrder = await order.save();
+    const { userId } = req.body;
 
-    res.status(201).json({ success: true, orderId: savedOrder._id });
+    // Safety check 1: Did the frontend actually send an ID?
+    if (!userId) {
+      return res.json({ success: true, orders: [] });
+    }
 
-    // Background email + invoice
-    setImmediate(() => sendInvoiceEmail(savedOrder));
+    const user = await User.findById(userId);
 
-    // Background Google Sheets update
-    setImmediate(() => appendOrderToSheet(savedOrder));
-  } catch (err) {
-    if (!res.headersSent)
-      res.status(500).json({ success: false, error: err.message });
+    // Safety check 2: Does the user exist in the database?
+    if (!user) {
+      return res.json({ success: true, orders: [] });
+    }
+
+    const orders = await Order.find({
+      "customer.email": user.email,
+    }).sort({ createdAt: -1 });
+
+    res.json({ success: true, orders });
+  } catch (error) {
+    console.error("My Orders Error:", error);
+    res
+      .status(500)
+      .json({ success: false, message: "Server error fetching orders" });
   }
 });
 
@@ -555,7 +590,7 @@ async function appendOrderToSheet(order) {
       },
     });
   } catch (error) {
-    console.error("❌ Google Sheets Error:", error.message);
+    console.error(" Google Sheets Error:", error.message);
   }
 }
 
@@ -605,7 +640,7 @@ async function updateOrderStatusInSheet(orderId, newStatus) {
       },
     });
   } catch (error) {
-    console.error("❌ Google Sheets Update Error:", error.message);
+    console.error(" Google Sheets Update Error:", error.message);
   }
 }
 

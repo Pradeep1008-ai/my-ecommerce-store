@@ -9,13 +9,20 @@ export function Navbar({ cartCount = 0 }: { cartCount?: number }) {
   const [user, setUser] = useState<any>(null)
   const [mounted, setMounted] = useState(false)
 
-  useEffect(() => {
-    setMounted(true)
-    const storedUser = localStorage.getItem("user")
-    if (storedUser) {
-      setUser(JSON.parse(storedUser))
-    }
-  }, [])
+ useEffect(() => {
+   setMounted(true);
+   const storedUser = localStorage.getItem("user");
+
+   // Check if it exists AND is not the literal string "undefined"
+   if (storedUser && storedUser !== "undefined") {
+     try {
+       setUser(JSON.parse(storedUser));
+     } catch (error) {
+       console.error("Corrupted user data in local storage. Clearing it.");
+       localStorage.removeItem("user");
+     }
+   }
+ }, []);
 
   const handleLogout = () => {
     localStorage.removeItem("token")
