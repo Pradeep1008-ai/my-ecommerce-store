@@ -33,7 +33,6 @@ export function WebGLShader() {
         gl_Position = vec4(position, 1.0);
       }
     `
-
     const fragmentShader = `
   precision highp float;
   uniform vec2 resolution;
@@ -49,7 +48,8 @@ export function WebGLShader() {
     float gx = p.x;
     float bx = p.x * (1.0 - d);
     
-    float intensity = 0.01; 
+    // Core wave thickness
+    float intensity = 0.05; 
     
     float r = intensity / abs(p.y + sin((rx + time) * xScale) * yScale);
     float g = intensity / abs(p.y + sin((gx + time) * xScale) * yScale);
@@ -57,14 +57,21 @@ export function WebGLShader() {
     
     vec3 wave = vec3(r, g, b);
     
-    // Smoothly fade out the light vertically so it never hits the box edges
-    float falloff = smoothstep(1.0, 0.3, abs(p.y));
-    wave *= falloff;
+    // CORRECTED FALLOFF: 
+    // This smoothly goes from 1.0 (full light) at the center to 0.0 (no light) at the edges.
+    // The 0.8 ensures the light dies completely BEFORE it hits the boundary.
+    float falloffY = 1.0 - smoothstep(0.2, 0.8, abs(p.y));
+    wave *= falloffY;
     
-    // Output pure light (dark areas will become invisible due to additive blending)
-    gl_FragColor = vec4(wave, 1.0);
+    // DYNAMIC TRANSPARENCY:
+    // The alpha (opacity) is now exactly equal to the brightest part of the wave.
+    // At the edges where 'wave' is 0.0, 'alpha' becomes 0.0 -> 100% invisible canvas.
+    float alpha = max(max(wave.r, wave.g), wave.b);
+    
+    gl_FragColor = vec4(wave, alpha);
   }
 `;
+    
     const initScene = () => {
   refs.scene = new THREE.Scene()
   
