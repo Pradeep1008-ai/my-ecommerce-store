@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Navbar } from "@/components/navbar"
 import { HeroSection } from "@/components/hero-section"
+import CursorRevealSection from "@/components/CursorRevealSection";
 import { ProductsGrid } from "@/components/products-grid"
 import { ConsultationForm } from "@/components/consultation-form"
 import { Footer } from "@/components/footer"
@@ -53,6 +54,7 @@ export default function Home() {
       )}
 
       <HeroSection />
+      <CursorRevealSection />
       <ProductsGrid products={products} onAddToCart={handleAddToCart} />
       <ConsultationForm />
       <Footer />

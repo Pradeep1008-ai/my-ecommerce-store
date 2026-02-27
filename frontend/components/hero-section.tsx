@@ -1,5 +1,6 @@
 "use client"
 
+import { useRef, useEffect, useState } from "react"
 import { WebGLShader } from "@/components/ui/web-gl-shader" 
 
 export function HeroSection() {
