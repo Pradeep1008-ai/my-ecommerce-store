@@ -49,11 +49,7 @@ export function WebGLShader() {
     float gx = p.x;
     float bx = p.x * (1.0 - d);
     
-    // --- LEVER 1: CORE THICKNESS & INTENSITY ---
-    // Default is 0.05. 
-    // Decrease to 0.02 for a very thin, sharp laser line.
-    // Increase to 0.09 for a thick, blown-out glowing beam.
-    float intensity = 0.05; 
+    float intensity = 0.01; 
     
     float r = intensity / abs(p.y + sin((rx + time) * xScale) * yScale);
     float g = intensity / abs(p.y + sin((gx + time) * xScale) * yScale);
@@ -61,63 +57,60 @@ export function WebGLShader() {
     
     vec3 wave = vec3(r, g, b);
     
-    // --- LEVER 2: OVERALL BRIGHTNESS MULTIPLIER ---
-    // Default is 1.0. 
-    // Set to 0.5 to cut the brightness in half (dimmer).
-    // Set to 1.5 or 2.0 to make it pop and shine brighter.
-    float brightness = 0.5; 
-    wave *= brightness;
-    
-    // The falloff mask to keep edges smooth
-    float falloff = smoothstep(1.0, 0.7, abs(p.y));
+    // Smoothly fade out the light vertically so it never hits the box edges
+    float falloff = smoothstep(1.0, 0.3, abs(p.y));
     wave *= falloff;
     
-    // Your exact #050505 CSS background color
-    vec3 bgColor = vec3(5.0 / 255.0, 5.0 / 255.0, 5.0 / 255.0);
-    
-    gl_FragColor = vec4(bgColor + wave, 1.0);
+    // Output pure light (dark areas will become invisible due to additive blending)
+    gl_FragColor = vec4(wave, 1.0);
   }
 `;
-
     const initScene = () => {
-      refs.scene = new THREE.Scene()
-      refs.renderer = new THREE.WebGLRenderer({ canvas })
-      refs.renderer.setPixelRatio(window.devicePixelRatio)
-      refs.renderer.setClearColor(new THREE.Color(0x050505))
-      refs.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, -1)
+  refs.scene = new THREE.Scene()
+  
+  // 1. ADD alpha: true to the renderer
+  refs.renderer = new THREE.WebGLRenderer({ canvas, alpha: true }) 
+  refs.renderer.setPixelRatio(window.devicePixelRatio)
+  
+  // 2. Set clear color to black with 0 opacity (transparent)
+  refs.renderer.setClearColor(0x000000, 0) 
+  refs.camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, -1)
 
-      refs.uniforms = {
-        resolution: { value: [canvas.clientWidth, canvas.clientHeight] },
-        time: { value: 0.0 },
-        xScale: { value: 1.0 },
-        yScale: { value: 0.5 },
-        distortion: { value: 0.15 },
-      }
+  refs.uniforms = {
+    resolution: { value: [canvas.clientWidth, canvas.clientHeight] },
+    time: { value: 0.0 },
+    xScale: { value: 1.0 },
+    yScale: { value: 0.5 },
+    distortion: { value: 0.008 },
+  }
 
-      const position = [
-        -1.0, -1.0, 0.0,
-         1.0, -1.0, 0.0,
-        -1.0,  1.0, 0.0,
-         1.0, -1.0, 0.0,
-        -1.0,  1.0, 0.0,
-         1.0,  1.0, 0.0,
-      ]
+  const position = [
+    -1.0, -1.0, 0.0,
+     1.0, -1.0, 0.0,
+    -1.0,  1.0, 0.0,
+     1.0, -1.0, 0.0,
+    -1.0,  1.0, 0.0,
+     1.0,  1.0, 0.0,
+  ]
 
-      const positions = new THREE.BufferAttribute(new Float32Array(position), 3)
-      const geometry = new THREE.BufferGeometry()
-      geometry.setAttribute("position", positions)
+  const positions = new THREE.BufferAttribute(new Float32Array(position), 3)
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute("position", positions)
 
-      const material = new THREE.RawShaderMaterial({
-        vertexShader,
-        fragmentShader,
-        uniforms: refs.uniforms,
-        side: THREE.DoubleSide,
-      })
+  const material = new THREE.RawShaderMaterial({
+    vertexShader,
+    fragmentShader,
+    uniforms: refs.uniforms,
+    side: THREE.DoubleSide,
+    // 3. ADD transparency and AdditiveBlending here
+    transparent: true,
+    blending: THREE.AdditiveBlending, 
+  })
 
-      refs.mesh = new THREE.Mesh(geometry, material)
-      refs.scene.add(refs.mesh)
-      handleResize()
-    }
+  refs.mesh = new THREE.Mesh(geometry, material)
+  refs.scene.add(refs.mesh)
+  handleResize()
+}
 
     const animate = () => {
       if (refs.uniforms) refs.uniforms.time.value += 0.01
