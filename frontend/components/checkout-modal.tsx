@@ -38,8 +38,8 @@ export function CheckoutModal({ isOpen, onClose, cartItems, onRemoveItem }: Chec
 
   if (!isOpen) return null
 
-  // Error-free API URL logic
-  const API_URL = process.env.NEXT_PUBLIC_API_URL || `${process.env.NEXT_PUBLIC_API_URL}`
+  // Fixed API URL logic for local dev safety
+  const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
   const subtotal = cartItems.reduce((sum, item) => sum + item.price, 0)
   const gstAmount = subtotal * 0.18
@@ -52,7 +52,13 @@ export function CheckoutModal({ isOpen, onClose, cartItems, onRemoveItem }: Chec
   const saveOrderToDatabase = async (method: string) => {
     const orderData = {
         customer: formData, 
-        items: cartItems.map(item => ({ name: item.name, price: item.price, hsnCode: item.hsnCode || 'N/A' })),
+        // Added quantity to ensure the PDF generator works perfectly
+        items: cartItems.map(item => ({ 
+            name: item.name, 
+            price: item.price, 
+            quantity: item.quantity || 1, 
+            hsnCode: item.hsnCode || 'N/A' 
+        })),
         subtotal: subtotal,
         gstAmount: gstAmount,
         totalAmount: total,
@@ -70,7 +76,7 @@ export function CheckoutModal({ isOpen, onClose, cartItems, onRemoveItem }: Chec
         const data = await response.json()
 
         if (data.success) {
-            alert(`Order Confirmed! Your Order ID is: ${data.orderId || data.order?._id}`)
+            alert(`Order Confirmed! Your Order ID is: ${data.order._id || data.orderId}`)
             onClose() 
             window.location.href = '/my-orders' 
         } else {
@@ -183,45 +189,45 @@ export function CheckoutModal({ isOpen, onClose, cartItems, onRemoveItem }: Chec
                 <p className="text-sm text-muted-foreground font-mono">Cart is empty.</p>
               ) : (
                 cartItems.map((item, index) => (
-  <div key={index} className="flex justify-between items-start text-sm font-mono border-b border-gray-800 pb-2">
-    
-    <span className="truncate pr-2 text-gray-300">
-      {item.name}
-      <span className="block text-xs text-gray-500 mt-1">
-        HSN: {item.hsnCode || 'N/A'}
-      </span>
-    </span>
+                  <div key={index} className="flex justify-between items-start text-sm font-mono border-b border-gray-800 pb-2">
+                    
+                    <span className="truncate pr-2 text-gray-300">
+                      {item.name}
+                      <span className="block text-xs text-gray-500 mt-1">
+                        HSN: {item.hsnCode || 'N/A'}
+                      </span>
+                    </span>
 
-    <div className="flex items-center gap-3">
-      <span className="text-red-500">
-        <span className="text-[75%] mr-1">₹</span>
-        {item.price.toFixed(2)}
-      </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-red-500">
+                        <span className="text-[75%] mr-1">₹</span>
+                        {item.price.toFixed(2)}
+                      </span>
 
-      {/* ✅ Remove button */}
-      <button
-        type="button"
-        onClick={() => onRemoveItem(index)}
-        className="text-gray-500 hover:text-red-500"
-        title="Remove item"
-      >
-        <X size={16} />
-      </button>
-    </div>
-  </div>
-))
+                      {/* ✅ Remove button */}
+                      <button
+                        type="button"
+                        onClick={() => onRemoveItem(index)}
+                        className="text-gray-500 hover:text-red-500"
+                        title="Remove item"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  </div>
+                ))
               )}
             </div>
             
             <div className="space-y-2 border-t border-gray-800 pt-4 font-mono text-sm">
               <div className="flex justify-between text-gray-400">
-                <span>Subtotal:</span><span><span className="text-[75%] align-center mr-2px">₹</span>{subtotal.toFixed(2)}</span>
+                <span>Subtotal:</span><span><span className="text-[75%] align-center mr-0.5">₹</span>{subtotal.toFixed(2)}</span>
               </div>
               <div className="flex justify-between text-gray-400">
-                <span>GST (18%):</span><span><span className="text-[75%] align-center mr-2px">₹</span>{gstAmount.toFixed(2)}</span>
+                <span>GST (18%):</span><span><span className="text-[75%] align-center mr-0.5">₹</span>{gstAmount.toFixed(2)}</span>
               </div>
               <div className="flex justify-between font-bold text-white text-lg mt-2 pt-2 border-t border-red-900/30">
-                <span>Total:</span><span className="text-red-500"><span className="text-[75%] align-center mr-2px">₹</span>{total.toFixed(2)}</span>
+                <span>Total:</span><span className="text-red-500"><span className="text-[75%] align-center mr-0.5">₹</span>{total.toFixed(2)}</span>
               </div>
             </div>
           </div>

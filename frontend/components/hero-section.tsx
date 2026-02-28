@@ -2,7 +2,8 @@
 
 import { useRef, useEffect, useState } from "react"
 import { WebGLShader } from "@/components/ui/web-gl-shader" 
-
+import HoverGlitchText from "./ui/hover-glitch-text";
+import GlitchText from "./ui/glitch-text";
 export function HeroSection() {
   const scrollToConsult = () => {
     const el = document.getElementById("consultation")
@@ -48,11 +49,10 @@ export function HeroSection() {
           {"// CLEAN ENERGY EVOLUTION"}
         </p>
        <h1 className="mb-6 font-sans text-5xl font-bold leading-tight tracking-tight text-foreground md:text-7xl">
-  <span className="text-balance">POWERING</span>
+  <GlitchText text="POWERING" className="text-balance font-sans" />
   <br />
   <span className="gradient-text">YOUR</span>{" "}
-  <span className="text-balance">FUTURE</span>
-
+  <GlitchText text="FUTURE" className="text-balance font-sans" />
   <style jsx>{`
     .gradient-text {
       /* Create the gradient colors */
@@ -85,11 +85,11 @@ export function HeroSection() {
     }
   `}</style>
 </h1>
-        <p className="mx-auto mb-10 max-w-xl font-mono text-sm leading-relaxed text-muted-foreground">
-          High-efficiency solar modules and smart energy systems engineered for
-          sustainable performance. Industrial-grade reliability meets next-gen
-          renewable innovation.
-        </p>
+       <p className="mx-auto mb-10 max-w-xl font-mono text-sm leading-relaxed text-muted-foreground">
+  <GlitchText 
+    text="High-efficiency solar modules and smart energy systems engineered for sustainable performance. Industrial-grade reliability meets next-gen renewable innovation."
+  />
+</p>
         <button
           onClick={scrollToConsult}
           className="group relative inline-flex items-center gap-2 border-0 bg-primary px-8 py-4 font-mono text-sm font-bold tracking-widest text-primary-foreground uppercase transition-all hover:shadow-[0_0_30px_rgba(255,0,0,0.4)]"

@@ -92,24 +92,27 @@ app.delete("/api/products/:id", async (req, res) => {
 // ================= CONSULT =================
 app.post("/api/consult", async (req, res) => {
   try {
-    const { name, email, phone, message } = req.body;
+    // 1. Change 'message' to 'address'
+    const { name, email, phone, address } = req.body;
 
-    const consult = new Consultation({ name, email, phone, message });
+    // 2. Pass 'address' to the Database model
+    const consult = new Consultation({ name, email, phone, address });
     await consult.save();
 
+    // 3. Update the Nodemailer text to show the address in your email
     await transporter.sendMail({
       from: process.env.EMAIL_USER,
       to: process.env.EMAIL_USER,
-      subject: `New Consult: ${name}`,
-      text: `${name} | ${phone}\n${message}`,
+      subject: `New Site Visit Request: ${name}`,
+      text: `Name: ${name} \nPhone: ${phone} \nEmail: ${email} \n\nSite Address: \n${address}`,
     });
 
     res.json({ success: true });
-  } catch {
+  } catch (error) {
+    console.error(error);
     res.status(500).json({ success: false });
   }
 });
-
 // ================= AUTH =================
 app.post("/api/register", async (req, res) => {
   try {
@@ -121,8 +124,7 @@ app.post("/api/register", async (req, res) => {
         message: "User already exists with this email",
       });
 
-    // FIX: We just pass the raw password now.
-    // Your User.js file will automatically hash it before saving!
+    // Native hashing handled by User.js Model
     const user = new User({ name, email, password });
     await user.save();
 
@@ -133,6 +135,7 @@ app.post("/api/register", async (req, res) => {
       .json({ success: false, message: "Server error during registration" });
   }
 });
+
 app.post("/api/login", async (req, res) => {
   try {
     const { email, password } = req.body;
@@ -165,7 +168,7 @@ app.post("/api/login", async (req, res) => {
       token,
       user: {
         id: user._id,
-        _id: user._id,
+        _id: user._id, // Sending both for frontend compatibility
         name: user.name,
         email: user.email,
         role: user.role,
@@ -214,22 +217,17 @@ app.post("/api/razorpay/verify-payment", (req, res) => {
   }
 });
 
-// ================= ORDERS =================
+// ================= ORDERS API =================
+
+// Safe My Orders Route (Removed the duplicate below)
 app.post("/api/my-orders", async (req, res) => {
   try {
     const { userId } = req.body;
 
-    // Safety check 1: Did the frontend actually send an ID?
-    if (!userId) {
-      return res.json({ success: true, orders: [] });
-    }
+    if (!userId) return res.json({ success: true, orders: [] });
 
     const user = await User.findById(userId);
-
-    // Safety check 2: Does the user exist in the database?
-    if (!user) {
-      return res.json({ success: true, orders: [] });
-    }
+    if (!user) return res.json({ success: true, orders: [] });
 
     const orders = await Order.find({
       "customer.email": user.email,
@@ -244,39 +242,31 @@ app.post("/api/my-orders", async (req, res) => {
   }
 });
 
-// ================= ADMIN & USER ORDERS =================
+// Fetch all orders for Admin
 app.get("/api/orders", async (req, res) => {
-  const orders = await Order.find().sort({ createdAt: -1 });
-  res.json({ success: true, orders });
+  try {
+    const orders = await Order.find().sort({ createdAt: -1 });
+    res.json({ success: true, orders });
+  } catch (error) {
+    res.status(500).json({ success: false });
+  }
 });
 
-app.post("/api/my-orders", async (req, res) => {
-  const { userId } = req.body;
-
-  const user = await User.findById(userId);
-  const orders = await Order.find({
-    "customer.email": user.email,
-  }).sort({ createdAt: -1 });
-
-  res.json({ success: true, orders });
-});
-
+// Update Order Status
 app.put("/api/orders/:id/status", async (req, res) => {
   try {
     const { status } = req.body;
 
-    // Database update
     await Order.findByIdAndUpdate(req.params.id, { status });
     res.json({ success: true, message: "Order status updated!" });
 
-    // Background Google Sheet update
     setImmediate(() => updateOrderStatusInSheet(req.params.id, status));
   } catch (error) {
     res.status(500).json({ success: false, message: "Server Error" });
   }
 });
 
-// ================= CANCEL ORDER (NEW) =================
+// Cancel Order
 app.put("/api/orders/:id/cancel", async (req, res) => {
   try {
     const orderId = req.params.id;
@@ -288,7 +278,6 @@ app.put("/api/orders/:id/cancel", async (req, res) => {
         .json({ success: false, message: "Order not found" });
     }
 
-    // Strictly prevent cancellation if already shipped
     if (order.status === "Shipped") {
       return res.status(400).json({
         success: false,
@@ -296,7 +285,6 @@ app.put("/api/orders/:id/cancel", async (req, res) => {
       });
     }
 
-    // Change status to Cancelled and save
     order.status = "Cancelled";
     await order.save();
 
@@ -306,13 +294,54 @@ app.put("/api/orders/:id/cancel", async (req, res) => {
       order,
     });
 
-    // Update Google Sheets in the background automatically!
     setImmediate(() => updateOrderStatusInSheet(orderId, "Cancelled"));
   } catch (error) {
     console.error("Cancellation Error:", error);
     res.status(500).json({
       success: false,
       message: "Server Error: Could not cancel order.",
+    });
+  }
+});
+
+// ================= CREATE NEW ORDER (THE FIX) =================
+app.post("/api/orders", async (req, res) => {
+  try {
+    const { customer, items, subtotal, gstAmount, totalAmount, paymentMethod } =
+      req.body;
+
+    const newOrder = new Order({
+      customer,
+      items,
+      subtotal,
+      gstAmount,
+      totalAmount,
+      paymentMethod: paymentMethod || "COD",
+      status: "Pending",
+    });
+
+    await newOrder.save();
+
+    res.status(201).json({
+      success: true,
+      message: "Order placed successfully",
+      order: newOrder,
+    });
+
+    // Background Automations Triggered Smoothly
+    if (typeof appendOrderToSheet === "function") {
+      setImmediate(() => appendOrderToSheet(newOrder));
+    }
+
+    if (typeof sendInvoiceEmail === "function") {
+      setImmediate(() => sendInvoiceEmail(newOrder));
+    }
+  } catch (error) {
+    console.error("Order Creation Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server Error: Could not place order.",
+      error: error.message,
     });
   }
 });
